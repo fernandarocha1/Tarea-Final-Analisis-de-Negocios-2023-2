@@ -737,3 +737,25 @@ Rented_Bike_Counts$pred_new <- unnormalize(Rented_Bike_Counts$pred)
 Rented_Bike_Counts$error <- Rented_Bike_Counts$pred_new - Rented_Bike_Counts$actual
 head(Rented_Bike_Counts, n = 3)
 ```
+
+```{r}
+tree.fit = tree(Rented_Bike_Count~ ., data=train)
+summary(tree.fit)
+plot(tree.fit)
+text(tree.fit, pretty=0)
+tree_pred=predict(tree.fit, newdata= test)
+ecm1 <- sqrt(mean((test$Rented_Bike_Count-tree_pred)^2))
+ecm1
+```
+
+```{r}
+tree.fit4 = rpart(formula=Rented_Bike_Count~ ., data=train)
+summary(tree.fit4)
+tree_plot2 = rpart.plot(tree.fit4)
+tree_pred4=predict(tree.fit4, test)
+ecm2 <- sqrt(mean((test$Rented_Bike_Count-tree_pred4)^2))
+ecm2
+```
+
+
+
