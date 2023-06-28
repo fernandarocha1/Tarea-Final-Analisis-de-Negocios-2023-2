@@ -15,11 +15,11 @@ Integrantes: Tomás Cea, Julissa Muñoz, Rodrigo Muñoz, Fernanda Rocha
 Datos originales:
 
 ```{r}
-train <- read.csv("C:/Users/GOMUG/OneDrive/Desktop/Semestre 2023-1/Analisis de Negocios/Trabajo Final/Train.csv")
+train <- read.csv("Train.csv")
 ```
 
 ```{r}
-test <- read.csv("C:/Users/GOMUG/OneDrive/Desktop/Semestre 2023-1/Analisis de Negocios/Trabajo Final/Test.csv")
+test <- read.csv("Test.csv")
 ```
 
 ### Semilla
