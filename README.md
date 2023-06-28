@@ -19,20 +19,20 @@ Además de la problemática principal, se tienen problemáticas secundarias dada
 La problemática a tratar se centra en la necesidad de predecir la demanda de bicicletas compartidas por hora en una ciudad metropolitana, con el propósito de apoyar la movilidad dentro de este espacio urbano y de asegurar los recursos para su correcto funcionamiento, esto se desarrollará por medio de diferentes estrategias brindadas a través de este documento, donde se realizan todos análisis respectivos. 
 El concepto de movilidad amigable con el medio ambiente ha sonado bastante en la sociedad de hoy en día, siendo su principal símbolo un medio de transporte que cada vez se vuelve más frecuente y popular en las ciudades de todo el mundo, no solo por su nulo consumo de combustibles y emisión de gases de efecto invernadero, sino que también por su comodidad durante el transporte mismo y su reducido tamaño, la bicicleta se ha convertido en uno de los artefactos preferidos por millones de usuarios para movilizarse día a día a diferentes lugares, promoviendo la idea de un estilo de vida más saludable y sostenible, al mismo tiempo que se reduce la congestión del tráfico y se mejora la calidad del aire, lo cual ha traído consigo un aumento de la demanda en estos aparatos y con esto una visión de oportunidad de negocio de muchas empresas y ciudades. 
 Para llevar a cabo estos negocios y contar con una rentabilidad considerable, se debe tener claridad de cuáles son las variables que afectan en la decisión de un usuario de utilizar o no este medio de transporte, conociendo de esta manera la demanda poblacional del entorno y calculando con certeza cual es la disponibilidad requerida en cada momento, para esto se analiza y presenta una base de datos que cuenta con 8760 observaciones y 14 características, dentro de las cuáles se puede encontrar información meteorológica, fecha y número de bicicletas alquiladas por hora, presentándose a continuación cada una de ellas:
-	Fecha
-	Hora
-	Temperatura (°C)
-	Humedad (%)
-	Velocidad del viento (m/s) 
-	Visibilidad (10m) 
-	Punto de Rocío (°C)
-	Radiación Solar (MJ/m2)
-	Nevadas (cm)
-	Precipitaciones (mm)
-	Temporadas del año: Verano, otoño, invierno, primavera 
-	Día festivo: Si es festivo o no es festivo 
-	Dia laboral: Si es día laboral o no es día laboral 
-	Número de bicicletas rentadas por hora
+• 	Fecha
+• 	Hora
+• 	Temperatura (°C)
+• 	Humedad (%)
+• 	Velocidad del viento (m/s) 
+• 	Visibilidad (10m) 
+• 	Punto de Rocío (°C)
+• 	Radiación Solar (MJ/m2)
+• 	Nevadas (cm)
+• 	Precipitaciones (mm)
+• 	Temporadas del año: Verano, otoño, invierno, primavera 
+• 	Día festivo: Si es festivo o no es festivo 
+• 	Dia laboral: Si es día laboral o no es día laboral 
+• 	Número de bicicletas rentadas por hora
 
 
 
