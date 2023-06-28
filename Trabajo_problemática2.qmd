@@ -46,7 +46,7 @@ library(vip)
 ```
 
 ```{r}
-rt<-"C:/Users/julis/Desktop/analisis/SeoulBikeData.csv"
+rt<-"SeoulBikeData.csv"
 
 df<-read.csv(rt,header=FALSE,skip=1)
 ```
