@@ -1,0 +1,739 @@
+---
+
+---
+title: "Trabajo_2"
+format: pdf
+editor: visual
+---
+
+```{r,results='hide',warning=FALSE,message=FALSE}
+library(DataExplorer) 
+library(tidyverse) 
+library(dplyr) 
+library(readr)
+library(stargazer)
+library(broom) 
+library(ggplot2) 
+library(modelr) 
+library(MASS)
+library(caret)
+library(e1071)
+library(pROC)
+library(caTools)
+library(PRROC)
+library(plotly)
+library(rpart) 
+library(class)
+library(gridExtra)
+library(cluster)
+library(factoextra)
+library(sampling)
+library(tree)
+library(rpart.plot)
+library(corrplot)
+```
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(gridExtra)
+library(scales)
+library(rsample)
+library(recipes)
+library(doParallel)
+library(vip)
+
+```
+
+```{r}
+rt<-"C:/Users/julis/Desktop/analisis/SeoulBikeData.csv"
+
+df<-read.csv(rt,header=FALSE,skip=1)
+```
+
+```{r}
+nombres_columnas <- c("Date","Rented_Bike_Count","Hour","Temperature","Humidity","Wind_speed", "Visibility","Dew_point_temperature","Solar_Radiation","Rainfall","Snowfall","Seasons","Holiday","Functioning_Day")
+colnames(df) <- nombres_columnas
+```
+
+## Análisis exploratorio
+
+```{r}
+plot_intro(df)
+plot_histogram(df)
+plot_bar(df)
+```
+
+```{r}
+plot_correlation(df)
+```
+
+```{r}
+plot_qq(df)
+```
+
+```{r, message=FALSE}
+attach(df)
+```
+
+```{r}
+boxplot(df$Rented_Bike_Count, ylab = "Rented Bike Count")
+boxplot(df$Hour, ylab = "Hour")
+boxplot(df$Temperature, ylab = "Temperature")
+boxplot(df$Humidity, ylab = "Humidity")
+boxplot(df$Wind_speed, ylab = "Wind speed ")
+boxplot(df$Visibility, ylab = "Visibility")
+boxplot(df$Dew_point_temperature, ylab = " Dew point temperature")
+boxplot(df$Solar_Radiation, ylab = " Solar Radiation")
+boxplot(df$Rainfall, ylab = " Rainfall")
+boxplot(df$Snowfall, ylab = " Snowfall")
+```
+
+```{r}
+plot2 <- ggplot(df, aes(x = Hour, y = Rented_Bike_Count,fill=Seasons)) +
+ylim(0,3600)+
+geom_boxplot() +
+scale_fill_manual(values = c("green2", "gold","blue","red"))+ ggtitle("Estaciones del año") +
+xlab("Hora") + ylab("Bicicletas Rentadas")
+plot2
+```
+
+```{r}
+summary(df$Functioning_Day)
+
+fd <- ggplot(df, aes(x = as.factor(Functioning_Day), y = Rented_Bike_Count)) + geom_boxplot(fill="slateblue", alpha=0.2) + ggtitle("Graf Demanda de bicicletas según functioning day") +  xlab("Functioning Day") + ylab("Rented Bike Count")
+fd + theme(plot.title = element_text(size=14, face="bold", hjust=0.5))
+```
+
+```{r}
+# Deleting rows when it is non-functioning day
+df<-df[!(df$Functioning_Day=="No"),]
+
+# removing unused columns
+df <- subset(df, select = - c(Functioning_Day))
+
+summary(df)
+```
+
+```{r}
+dfnum1 <- df %>% dplyr:: select(-Date,-Seasons,-Holiday)
+```
+
+```{r}
+df %>% 
+  ggplot(aes(Hour, Rented_Bike_Count)) +
+  geom_boxplot(aes(group = Hour)) +
+  geom_smooth(se = F)
+```
+
+```{r}
+df <- df %>% mutate(Contador_Observaciones = seq_along(Date))
+```
+
+```{r}
+df %>%
+  filter(Hour == 2 & Rented_Bike_Count > 1000) %>% 
+  select(Contador_Observaciones, Date, Hour, Rented_Bike_Count)
+```
+
+```{r}
+df <- df[-4923,]
+```
+
+```{r}
+df <-df%>% dplyr:: select(-Contador_Observaciones)
+```
+
+```{r}
+df %>% 
+  ggplot(aes(Hour, Rented_Bike_Count, color = Seasons)) +
+  geom_smooth(se = F, size = 1)
+```
+
+```{r}
+df %>% 
+  ggplot(aes(Hour, Rented_Bike_Count, color = Holiday)) +
+  geom_smooth(se = F, size = 1)
+```
+
+```{r}
+df %>% 
+  ggplot(aes(Temperature, Rented_Bike_Count)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth(se = F)
+```
+
+### Estimación lineal
+
+```{r}
+p1<-ggplot(df, aes(Temperature,Rented_Bike_Count)) +
+geom_point() +
+geom_smooth(method = "loess") +
+geom_smooth(se = FALSE, color = "red")
+```
+
+```{r}
+p2<-ggplot(df, aes(Hour,Rented_Bike_Count)) +
+geom_point() +
+geom_smooth(method = "rlm") +
+geom_smooth(se = FALSE, color = "red")
+```
+
+```{r}
+gridExtra::grid.arrange(p1, p2, nrow = 1)
+```
+
+```{r}
+dfbin <-df%>% dplyr:: select(-Date,-Seasons)
+```
+
+```{r}
+dfbin$Holiday[dfbin$Holiday=="No Holiday"]<-0
+dfbin$Holiday[dfbin$Holiday=="Holiday"]<-1
+```
+
+```{r}
+dfbin$Winter<-ifelse(df$Seasons=="Winter",1,0)
+dfbin$Summer<-ifelse(df$Seasons=="Summer",1,0)
+dfbin$Spring<-ifelse(df$Seasons=="Spring",1,0)
+```
+
+## Split
+
+### split bin
+
+```{r}
+set.seed(134)
+split <- sample.split(df,SplitRatio=0.8)
+train <- dfbin[split==TRUE,]
+train_Rbc <- dfbin[split==TRUE,"Rented_Bike_Count"]
+test <- dfbin[split==FALSE,]
+test_Rbc <- dfbin[split==FALSE,"Rented_Bike_Count"]
+```
+
+### split num1
+
+```{r}
+train_num1 <-train%>% dplyr:: select(-Holiday,-Winter,-Summer,-Spring)
+test_num1 <-test%>% dplyr:: select(-Holiday,-Winter,-Summer,-Spring)
+```
+
+```{r}
+df_train_RN_2 <- train
+df_test_RN_2 <-  test
+
+for (i in c("Holiday","Winter","Summer","Spring"))
+{
+df_train_RN_2[[i]]<-as.factor(df_train_RN_2[[i]])
+}
+for (i in c("Holiday","Winter","Summer","Spring"))
+{
+df_test_RN_2[[i]]<-as.factor(df_test_RN_2[[i]])
+}
+```
+
+## Regresión Lineal Simple
+
+```{r}
+modelo_lm1<-lm(Rented_Bike_Count ~ Hour, data = train)
+modelo_lm2<-lm(Rented_Bike_Count ~ Temperature, data = train)
+modelo_lm3<-lm(Rented_Bike_Count ~ Humidity, data = train)
+modelo_lm4<-lm(Rented_Bike_Count ~ Wind_speed, data = train)
+modelo_lm5<-lm(Rented_Bike_Count ~ Visibility, data = train)
+modelo_lm6<-lm(Rented_Bike_Count ~ Dew_point_temperature, data = train)
+modelo_lm7<-lm(Rented_Bike_Count ~ Solar_Radiation, data = train)
+modelo_lm8<-lm(Rented_Bike_Count ~ Rainfall, data = train)
+modelo_lm9<-lm(Rented_Bike_Count ~ Snowfall, data = train)
+```
+
+```{r}
+summary(modelo_lm1)
+summary(modelo_lm2)
+summary(modelo_lm3)
+summary(modelo_lm4)
+summary(modelo_lm5)
+summary(modelo_lm6)
+summary(modelo_lm7)
+summary(modelo_lm8)
+summary(modelo_lm9)
+```
+
+```{r}
+pr.lm1 <- predict(modelo_lm1,test)
+MSE.lm1 <- sum((pr.lm1 - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.lm1
+pr.lm2 <- predict(modelo_lm2,test)
+MSE.lm2 <- sum((pr.lm2 - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.lm2
+pr.lm3 <- predict(modelo_lm3,test)
+MSE.lm3 <- sum((pr.lm3 - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.lm3
+pr.lm4 <- predict(modelo_lm4,test)
+MSE.lm4 <- sum((pr.lm4 - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.lm4
+pr.lm5 <- predict(modelo_lm5,test)
+MSE.lm5 <- sum((pr.lm5 - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.lm5
+pr.lm6 <- predict(modelo_lm6,test)
+MSE.lm6 <- sum((pr.lm6 - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.lm6
+pr.lm7 <- predict(modelo_lm7,test)
+MSE.lm7 <- sum((pr.lm7 - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.lm7
+pr.lm8 <- predict(modelo_lm8,test)
+MSE.lm8 <- sum((pr.lm8 - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.lm8
+pr.lm9 <- predict(modelo_lm9,test)
+MSE.lm9 <- sum((pr.lm9 - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.lm9
+```
+```{r}
+cor(pr.lm2, test$Rented_Bike_Count)
+```
+
+## Regresión Lineal Multiple
+
+#### RLM bintrain
+
+```{r}
+modelo_rm1<-lm(Rented_Bike_Count ~ Hour + Temperature +Humidity + Wind_speed + Visibility + Dew_point_temperature + Solar_Radiation + Rainfall+Snowfall + Holiday + Winter + Summer + Spring, data=train)
+summary(modelo_rm1)
+```
+
+```{r}
+modelo_rm1<-lm(Rented_Bike_Count ~ Hour + Temperature +Humidity + Wind_speed + Visibility + Dew_point_temperature + Solar_Radiation + Rainfall+Snowfall + Holiday + Winter + Summer + Spring, data=train)
+summary(modelo_rm1)
+```
+
+```{r}
+pr.rm1 <- predict(modelo_rm1,test)
+MSE.rm1 <- sum((pr.rm1 - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.rm1
+```
+
+#### RLM bintrain optimizado (sin visibility)
+
+```{r}
+modelo_rm1_opt<-lm(Rented_Bike_Count ~ Hour + Temperature +Humidity + Wind_speed + Dew_point_temperature + Solar_Radiation + Rainfall+Snowfall + Holiday + Winter + Summer + Spring, data=train)
+summary(modelo_rm1_opt)
+```
+
+```{r}
+library(olsrr)
+ols_vif_tol(modelo_rm1_opt)
+```
+
+```{r}
+pr.rm1_opt <- predict(modelo_rm1_opt,test)
+MSE.rm1_opt <- sum((pr.rm1_opt - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.rm1_opt
+```
+
+```{r}
+cor(pr.rm1_opt, test$Rented_Bike_Count)
+```
+
+### RLM trainnum
+
+```{r}
+modelo_rm2<-lm(Rented_Bike_Count ~ Hour + Temperature +Humidity + Wind_speed + Visibility + Dew_point_temperature + Solar_Radiation + Rainfall+Snowfall , data=train_num1)
+summary(modelo_rm2)
+```
+
+```{r}
+pr.rm2 <- predict(modelo_rm2,test)
+MSE.rm2 <- sum((pr.rm2 - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.rm2
+```
+
+#### RLM numtrain optimizado (sin wind_speed,visibility,Dew point temperature, Snowfall )
+
+```{r}
+modelo_rm2_opt<-lm(Rented_Bike_Count ~ Hour + Temperature +Humidity + Solar_Radiation + Rainfall , data=train_num1)
+summary(modelo_rm2_opt)
+```
+
+```{r}
+pr.rm2_opt <- predict(modelo_rm2_opt,test)
+MSE.rm2_opt <- sum((pr.rm2_opt - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.rm2_opt
+```
+```{r}
+cor(pr.rm2_opt, test$Rented_Bike_Count)
+```
+
+### Iteración con interacciones
+
+Probamos con las variables con mayor correlación (Dew point Temperature y Temperature)
+
+```{r}
+modelo_rm3<-lm(Rented_Bike_Count ~ Hour + Temperature +Humidity + Wind_speed + Visibility + Dew_point_temperature + Solar_Radiation + Rainfall+Snowfall + Holiday + Winter + Summer + Spring + Dew_point_temperature*Temperature, data=train)
+summary(modelo_rm3)
+```
+
+```{r}
+pr.rm3 <- predict(modelo_rm3,test)
+MSE.rm3 <- sum((pr.rm3 - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.rm3
+```
+
+Mejoro el R\^2
+
+```{r}
+plot(modelo_rm1_opt)
+```
+
+```{r}
+residuos<-residuals(modelo_rm1_opt)
+hist(residuos, main = "Histograma de residuos", xlab = "Residuos")
+```
+
+```{r}
+ggplot(modelo_rm1_opt, aes(.fitted, .resid)) +
+geom_ref_line(h = 0) +
+geom_point() +
+geom_smooth(se = FALSE) + ggtitle("Residuos vs Ajuste")
+```
+
+```{r}
+modelo_rm1_opt_res <- augment(modelo_rm1_opt,train)
+p1<-ggplot(modelo_rm1_opt_res, aes(.fitted, .std.resid)) +
+geom_ref_line(h = 0) +
+geom_point() +
+geom_smooth(se = FALSE) +
+ggtitle("Residuos Estandarizados vs Ajuste")
+p2<-ggplot(modelo_rm1_opt_res, aes(.fitted, sqrt(.std.resid))) +
+geom_ref_line(h = 0) +
+geom_point() +
+geom_smooth(se = FALSE) +
+ggtitle("Reescalamiento")
+gridExtra::grid.arrange(p1, p2, nrow = 1)
+```
+
+```{r}
+qq_plot <- qqnorm(modelo_rm1_opt_res$.resid)
+qq_plot <- qqline(modelo_rm1_opt_res$.resid)
+```
+
+Por lo tanto no sigue una distribucion normal
+
+```{r}
+par(mfrow=c(1, 2))
+plot(modelo_rm1_opt, which = 4, id.n = 5)
+plot(modelo_rm1_opt, which = 5, id.n = 5)
+```
+
+La observacion 3998 influye demasiado en el modelo
+
+```{r}
+mod_train <- train[-c(3998), ]
+```
+
+```{r}
+modelo_rm_sqrt<-lm(sqrt(Rented_Bike_Count) ~ Hour + Temperature +Humidity + Wind_speed + Dew_point_temperature + Solar_Radiation + Rainfall+Snowfall + Holiday + Winter + Summer + Spring, data=mod_train)
+summary(modelo_rm_sqrt)
+```
+
+```{r}
+pr.rm_sqrt <- predict(modelo_rm_sqrt,test)
+MSE.rm_sqrt <- sum((pr.rm_sqrt - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.rm_sqrt
+```
+
+```{r}
+modelo_rm_sqrt_opt<-lm(sqrt(Rented_Bike_Count) ~ Hour + Humidity + Dew_point_temperature + Solar_Radiation + Rainfall + Holiday + Winter + Summer + Spring, data=mod_train)
+summary(modelo_rm_sqrt_opt)
+```
+
+```{r}
+pr.rm_sqrt_opt <- predict(modelo_rm_sqrt_opt,test)
+MSE.rm_sqrt_opt <- sum((pr.rm_sqrt_opt - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.rm_sqrt_opt
+```
+
+```{r}
+modelo_rm_sqrt2<-lm(sqrt(Rented_Bike_Count) ~ Hour + Temperature +Humidity + Wind_speed + Visibility + Dew_point_temperature + Solar_Radiation + Rainfall+Snowfall + Holiday + Winter + Summer + Spring + Dew_point_temperature*Temperature, data=mod_train)
+summary(modelo_rm_sqrt2)
+```
+
+```{r}
+pr.rm_sqrt2 <- predict(modelo_rm_sqrt2,test)
+MSE.rm_sqrt2 <- sum((pr.rm_sqrt2 - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.rm_sqrt2
+```
+
+```{r}
+modelo_rm_sqrt2_opt<-lm(sqrt(Rented_Bike_Count) ~ Hour + Humidity + Wind_speed + Visibility + Dew_point_temperature + Solar_Radiation + Rainfall + Holiday + Winter + Summer + Spring + Dew_point_temperature*Temperature, data=mod_train)
+summary(modelo_rm_sqrt2_opt)
+```
+
+```{r}
+pr.rm_sqrt2_opt <- predict(modelo_rm_sqrt2_opt,test)
+MSE.rm_sqrt2_opt <- sum((pr.rm_sqrt2_opt - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.rm_sqrt2_opt
+```
+
+```{r}
+modelo_rm_cu<-lm(Rented_Bike_Count^2 ~ Hour + Temperature +Humidity + Wind_speed + Dew_point_temperature + Solar_Radiation + Rainfall+Snowfall + Holiday +  Winter + Summer + Spring, data=mod_train)
+summary(modelo_rm_cu)
+```
+
+```{r}
+pr.rm_cu <- predict(modelo_rm_cu,test)
+MSE.rm_cu <- sum((pr.rm_cu - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.rm_cu
+```
+
+```{r}
+modelo_rm_sqrt2_opt1<-lm(sqrt(Rented_Bike_Count) ~ Hour + Humidity + Wind_speed + Visibility + Dew_point_temperature + Solar_Radiation + Rainfall + Holiday + Winter + Summer + Spring + Dew_point_temperature*Temperature, data=mod_train)
+summary(modelo_rm_sqrt2_opt1)
+```
+
+```{r}
+pr.rm_sqrt2_opt1 <- predict(modelo_rm_sqrt2_opt1,test)
+MSE.rm_sqrt2_opt1 <- sum((pr.rm_sqrt2_opt1 - test$Rented_Bike_Count)^2)/nrow(test)
+MSE.rm_sqrt2_opt1
+```
+
+```{r}
+dfbin2 <-df%>% dplyr:: select(-Date)
+dfbin2$Hour <- factor(dfbin2$Hour)
+dfbin2$Seasons <- factor(dfbin2$Seasons)
+dfbin2$Holiday <- factor(dfbin2$Holiday)
+```
+
+```{r}
+smp_size <- floor(0.80 * nrow(dfbin2))
+set.seed(123)
+trainIndex <- sample(seq_len(nrow(dfbin2)), size = smp_size)
+
+model1_prediction <- dfbin2[ -trainIndex,]
+model1 <- dfbin2[ trainIndex,]
+```
+
+```{r}
+row.names(model1) <- NULL
+modelo_RM1<-lm(Rented_Bike_Count ~ Hour + Temperature +Humidity + Wind_speed + Visibility + Dew_point_temperature + Solar_Radiation + Rainfall+Snowfall + Holiday + Seasons   , data=model1)
+summary(modelo_RM1)
+```
+```{r}
+pr.rm_sqrt2_opt2 <- predict(modelo_RM1,model1_prediction)
+MSE.rm_sqrt2_opt2 <- sum((pr.rm_sqrt2_opt2 - model1_prediction$Rented_Bike_Count)^2)/nrow(model1_prediction)
+MSE.rm_sqrt2_opt2
+```
+
+
+```{r}
+car::vif(modelo_RM1)
+```
+
+```{r}
+modelo_RM12<-lm(Rented_Bike_Count ~ Hour + Temperature + Humidity  + Dew_point_temperature + Solar_Radiation + Rainfall+Snowfall + Holiday + Seasons + Dew_point_temperature*Temperature  , data=model1)
+summary(modelo_RM12)
+```
+
+
+```{r}
+pr.RM12 <- predict(modelo_RM12,model1_prediction)
+MSE.RM12 <- sum((pr.RM12 - model1_prediction$Rented_Bike_Count)^2)/nrow(model1_prediction)
+MSE.RM12
+```
+```{r}
+cor(pr.RM12, model1_prediction$Rented_Bike_Count)
+```
+
+
+### Criterios de Información
+
+Se comparan los mejores modelos, para el lineal simple el con mayor R\^2 modelo_lm2, la RLM optimizada para todas las variables modelo_rm1_opt y la optimizada para las variables numericas modelo_rm2_opt
+
+#### AIC
+
+```{r}
+AIC(modelo_lm2)
+```
+
+```{r}
+AIC(modelo_rm1_opt)
+```
+
+```{r}
+AIC(modelo_rm2_opt)
+```
+
+```{r}
+AIC(modelo_RM12)
+```
+
+
+El mejor sería el con menor AIC, es decir, modelo_rm1_opt en el que se consideran todas las variables
+
+#### BIC
+
+```{r}
+BIC(modelo_lm2)
+```
+
+```{r}
+BIC(modelo_rm1_opt)
+```
+
+```{r}
+BIC(modelo_rm2_opt)
+```
+
+```{r}
+BIC(modelo_RM12)
+```
+
+En este caso tambien sería el menor el modelo_rm1_opt
+
+```{r, warning=FALSE}
+stargazer(modelo_lm2,modelo_rm1_opt,modelo_rm2_opt,type="text", header = FALSE)
+
+```
+
+El mayor R\^2 es el del modelo_rm1_opt con un 0,554 (muy bajo), se debe intentar con una interaccion.
+
+### Redes Neuronales
+
+```{r}
+set.seed(163)
+
+normalize <- function(x) {
+ return((x - min(x)) / (max(x) - min(x)))
+ }
+
+df_train_data_norm <- as.data.frame(lapply(train_num1, normalize))
+summary(df_train_data_norm$Rented_Bike_Count)
+summary(train_num1$Rented_Bike_Count)
+```
+
+```{r}
+df_test_data_norm <- as.data.frame(lapply(test_num1, normalize))
+summary(df_test_data_norm$Rented_Bike_Count)
+summary(test_num1$Rented_Bike_Count)
+```
+
+```{r}
+set.seed(163)
+library(neuralnet)
+concrete_model <- neuralnet(Rented_Bike_Count ~. , data = df_train_data_norm)
+```
+
+```{r}
+plot(concrete_model, rep="best")
+```
+
+```{r}
+model_results <- compute(concrete_model, df_test_data_norm[1:9])
+predicted_Rented_Bike_Count <- model_results$net.result
+cor(predicted_Rented_Bike_Count, df_test_data_norm$Rented_Bike_Count)
+```
+
+```{r}
+set.seed(163)
+concrete_model2 <- neuralnet(Rented_Bike_Count ~., data = df_train_data_norm, hidden=2,stepmax = 1000000)
+```
+
+```{r}
+plot(concrete_model2, rep="best")
+```
+
+```{r}
+model_results2 <- compute(concrete_model2, df_test_data_norm[1:9])
+predicted_Rented_Bike_Count2 <- model_results2$net.result
+cor(predicted_Rented_Bike_Count2, df_test_data_norm$Rented_Bike_Count)
+```
+
+```{r}
+concrete_model2a <- neuralnet(Rented_Bike_Count ~. , data = df_train_data_norm, hidden = 3, stepmax=10000000000)
+```
+
+```{r}
+plot(concrete_model2a, rep="best")
+```
+
+```{r}
+model_results2a <- compute(concrete_model2a, df_test_data_norm[1:9])
+predicted_Rented_Bike_Count2a <- model_results2a$net.result
+cor(predicted_Rented_Bike_Count2a, df_test_data_norm$Rented_Bike_Count)
+```
+
+```{r}
+model_net1 = neuralnet(formula=Rented_Bike_Count ~. , data = df_train_data_norm, hidden = 5,threshold = 0.01, stepmax=1e+07, rep=1, linear.output = TRUE)
+```
+
+```{r}
+plot(model_net1, rep="best")
+```
+
+```{r}
+model_results_net1 <- compute(model_net1, df_test_data_norm[1:9])
+predicted_Rented_Bike_Countnet1 <- model_results_net1$net.result
+cor(predicted_Rented_Bike_Countnet1, df_test_data_norm$Rented_Bike_Count)
+```
+
+```{r}
+model_net2 <- neuralnet(formula=Rented_Bike_Count ~. , data = df_train_data_norm, hidden = 5,threshold = 0.01, stepmax=1e+07)
+```
+
+```{r}
+plot(model_net2, rep="best")
+```
+
+```{r}
+model_results_net2 <- compute(model_net2, df_test_data_norm[1:9])
+predicted_Rented_Bike_Countnet2 <- model_results_net2$net.result
+cor(predicted_Rented_Bike_Countnet2, df_test_data_norm$Rented_Bike_Count)
+```
+
+```{r}
+softplus <- function(x) { log(1 + exp(x)) }
+concrete_model3 <- neuralnet(Rented_Bike_Count ~. , data = df_train_data_norm, hidden = 3, act.fct = softplus,stepmax = 10000000)
+```
+
+```{r}
+model_results3 <- compute(concrete_model3, df_test_data_norm[1:9])
+predicted_Rented_Bike_Count3 <- model_results3$net.result
+cor(predicted_Rented_Bike_Count3,  df_test_data_norm$Rented_Bike_Count)
+```
+
+```{r}
+tanh <- function(x) {
+return((1 - exp(-2*x)) / 1 + exp(-2*x))
+}
+```
+
+```{r}
+concrete_model4 <- neuralnet(Rented_Bike_Count ~. , data = df_train_data_norm, hidden = 2, act.fct = tanh)
+```
+
+```{r}
+plot(concrete_model4, rep="best")
+```
+
+```{r}
+model_results4 <- compute(concrete_model4, df_test_data_norm[1:9])
+predicted_Rented_Bike_Count4 <- model_results4$net.result
+cor(predicted_Rented_Bike_Count4,  df_test_data_norm$Rented_Bike_Count)
+```
+
+```{r}
+Rented_Bike_Counts <- data.frame(actual = test_num1$Rented_Bike_Count,pred = predicted_Rented_Bike_Count3  )
+head(Rented_Bike_Counts, n = 3)
+```
+
+```{r}
+cor(Rented_Bike_Count$pred, Rented_Bike_Count$actual)
+```
+
+```{r}
+unnormalize <- function(x) {
+return((x * (max(df$Rented_Bike_Count)) -
+min(df$Rented_Bike_Count)) + min(df$Rented_Bike_Count))
+}
+Rented_Bike_Counts$pred_new <- unnormalize(Rented_Bike_Counts$pred)
+Rented_Bike_Counts$error <- Rented_Bike_Counts$pred_new - Rented_Bike_Counts$actual
+head(Rented_Bike_Counts, n = 3)
+```
