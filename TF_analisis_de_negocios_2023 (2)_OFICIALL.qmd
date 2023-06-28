@@ -1,0 +1,1226 @@
+---
+title: "Trabajo Análisis"
+format: html
+editor: visual
+---
+
+# Trabajo Final Análisis de Negocios
+
+Integrantes: Tomás Cea, Julissa Muñoz, Rodrigo Muñoz, Fernanda Rocha
+
+31 de mayo del 2023
+
+## Lectura de datos
+
+Datos originales:
+
+```{r}
+train <- read.csv("C:/Users/GOMUG/OneDrive/Desktop/Semestre 2023-1/Analisis de Negocios/Trabajo Final/Train.csv")
+```
+
+```{r}
+test <- read.csv("C:/Users/GOMUG/OneDrive/Desktop/Semestre 2023-1/Analisis de Negocios/Trabajo Final/Test.csv")
+```
+
+### Semilla
+
+```{r}
+set.seed(163)
+```
+
+### Bibliotecas
+
+```{r,results='hide',warning=FALSE,message=FALSE}
+library(DataExplorer) 
+library(tidyverse) 
+library(dplyr) 
+library(readr)
+library(stargazer)
+library(broom) 
+library(ggplot2) 
+library(modelr) 
+library(MASS)
+library(caret)
+library(e1071)
+library(pROC)
+library(caTools)
+library(PRROC)
+library(plotly)
+library(rpart) 
+library(class)
+library(gridExtra)
+library(cluster)
+library(factoextra)
+library(sampling)
+library(tree)
+library(rpart.plot)
+library(corrplot)
+library(keras)
+library(reticulate)
+library(nnet)
+library(rsample)
+library(parsnip)
+library(recipes)
+library(workflows)
+library(yardstick)
+library(tensorflow)
+```
+
+## Análisis exploratorio de datos
+
+```{r}
+plot_intro(train)
+```
+
+```{r}
+plot_intro(test)
+```
+
+```{r}
+plot_bar(train)
+```
+
+```{r}
+plot_histogram(train)
+```
+
+```{r}
+plot_correlation(train)
+```
+
+```{r, message=FALSE}
+attach(train)
+```
+
+```{r}
+boxplot(Flight.Distance, ylab = 'Flight.Distance')
+```
+
+```{r}
+boxplot(Age, ylab = 'Age')
+```
+
+```{r}
+boxplot(Inflight.wifi.service, ylab = 'Inflight wifi service')
+```
+
+```{r}
+boxplot(Departure.Arrival.time.convenient, ylab = 'Departure/Arrival time convenient')
+```
+
+```{r}
+boxplot(Ease.of.Online.booking, ylab = 'Ease of Online booking')
+```
+
+```{r}
+boxplot(Gate.location, ylab = 'Gate location')
+```
+
+```{r}
+boxplot(Food.and.drink, ylab = 'Food and drink')
+```
+
+```{r}
+boxplot(Online.boarding, ylab = 'Online boarding')
+```
+
+```{r}
+boxplot(Seat.comfort, ylab = 'Seat comfort')
+```
+
+```{r}
+boxplot(Inflight.entertainment, ylab = 'Inflight entertainment')
+```
+
+```{r}
+boxplot(On.board.service, ylab = 'On-board service')
+```
+
+```{r}
+boxplot(Leg.room.service, ylab = 'Leg room service')
+```
+
+```{r}
+boxplot(Baggage.handling, ylab = 'Baggage handling')
+```
+
+```{r}
+boxplot(Checkin.service, ylab = 'Check-in service')
+```
+
+```{r}
+boxplot(Inflight.service, ylab = 'Inflight service')
+```
+
+```{r}
+boxplot(Cleanliness, ylab = 'Cleanliness')
+```
+
+```{r}
+boxplot(Departure.Delay.in.Minutes, ylab = 'Departure Delay in Minutes')
+```
+
+```{r}
+boxplot(Arrival.Delay.in.Minutes, ylab = 'Arrival Delay in Minutes')
+```
+
+## Limpieza de datos
+
+Valores perdidos
+
+```{r}
+df<-train[complete.cases(train),]
+dfp<-test[complete.cases(test),]
+```
+
+Borrar variables
+
+```{r}
+df_train <- df %>% dplyr::select(-X,-id) 
+df_test <- dfp %>% dplyr::select(-X,-id) 
+```
+
+Borrar datos nulos
+
+```{r}
+df_train <- filter_if(df_train, is.character , all_vars(!is.na(.)))
+df_test <- filter_if(df_test, is.character , all_vars(!is.na(.)))
+```
+
+Eliminar outliers
+
+```{r}
+for (i in c("Flight.Distance"))
+{
+outliers <- boxplot.stats(df_train[[i]])$out
+df_train[[i]][df_train[[i]] %in% outliers] <- NA
+}
+```
+
+```{r}
+df_train <- filter_if(df_train, is.numeric , all_vars(!is.na(.)))
+```
+
+Creación de base numérica:
+
+```{r}
+dfnum1 <- df_train %>% dplyr:: select(-Gender,-Customer.Type,-Type.of.Travel,-Class,-satisfaction)
+dfnum2 <- df_test %>% dplyr:: select(-Gender,-Customer.Type,-Type.of.Travel,-Class,-satisfaction)
+```
+
+```{r}
+for (i in c("Age","Flight.Distance","Inflight.wifi.service","Departure.Arrival.time.convenient","Ease.of.Online.booking","Gate.location","Food.and.drink","Online.boarding","Seat.comfort","Inflight.entertainment","On.board.service","Leg.room.service","Baggage.handling","Checkin.service","Inflight.service","Cleanliness","Departure.Delay.in.Minutes","Arrival.Delay.in.Minutes"))
+{
+dfnum1[[i]]<-as.numeric(dfnum1[[i]])
+dfnum2[[i]]<-as.numeric(dfnum2[[i]])
+}
+```
+
+```{r}
+df_train$satisfaction[df_train$satisfaction=="neutral or dissatisfied"]<-0
+df_train$satisfaction[df_train$satisfaction=="satisfied"]<-1
+df_test$satisfaction[df_test$satisfaction=="neutral or dissatisfied"]<-0
+df_test$satisfaction[df_test$satisfaction=="satisfied"]<-1
+df_train$Gender <- as.factor(df_train$Gender)
+df_train$Customer.Type <- as.factor(df_train$Customer.Type)
+df_train$Type.of.Travel <- as.factor(df_train$Type.of.Travel)
+df_train$Class <- as.factor(df_train$Class)
+df_train$satisfaction <- as.factor(df_train$satisfaction)
+df_test$Gender <- as.factor(df_test$Gender)
+df_test$Customer.Type <- as.factor(df_test$Customer.Type)
+df_test$Type.of.Travel <- as.factor(df_test$Type.of.Travel)
+df_test$Class <- as.factor(df_test$Class)
+df_test$satisfaction <- as.factor(df_test$satisfaction)
+```
+
+```{r}
+for (i in c("Gender","Customer.Type","Type.of.Travel","Class","satisfaction"))
+{
+df_train[[i]]<-as.factor(df_train[[i]])
+}
+for (i in c("Gender","Customer.Type","Type.of.Travel","Class","satisfaction"))
+{
+df_test[[i]]<-as.factor(df_test[[i]])
+}
+```
+
+```{r}
+cor_matrix <- cor(dfnum1)
+threshold <- 0.7
+for (i in 1:(ncol(cor_matrix)-1)) {
+  for (j in (i+1):ncol(cor_matrix)) {
+    correlation <- cor_matrix[i, j]
+
+    if (abs(correlation) > threshold) {
+      cat("Correlación entre", colnames(cor_matrix)[i], "y", colnames(cor_matrix)[j], "es mayor a 0.7\n", " su correlación es igual a", correlation)
+      
+    }
+  }
+}
+```
+
+### Análisis de componentes principales
+
+```{r}
+plot_prcomp(dfnum1)
+```
+
+```{r}
+pca <- prcomp(dfnum1, scale = TRUE)
+```
+
+```{r}
+prop_varianza <- pca$sdev^2 / sum(pca$sdev^2)
+```
+
+```{r}
+pca_var<-ggplot(data = data.frame(prop_varianza, pc = 1:length(prop_varianza)), aes(x = pc, y = prop_varianza)) + 
+  geom_col(width = 0.3) +  scale_y_continuous(limits = c(0,1)) +  theme_bw() +
+  labs(x = "Componente principal", y = "Prop. de varianza explicada")
+pca_var
+```
+
+```{r}
+prop_varianza_acum <- cumsum(prop_varianza)
+```
+
+```{r}
+pca_var_acum<-ggplot(data = data.frame(prop_varianza_acum, pc = 1:length(prop_varianza)), aes(x = pc, y = prop_varianza_acum, group = 1)) +
+  geom_point() +  geom_line() +  theme_bw() +  labs(x = "Componente principal", y = "Prop. varianza explicada acumulada")
+
+pca_var_acum
+```
+
+```{r}
+fviz_eig(pca,addlabels = TRUE, ylim = c(0, 30))
+```
+
+```{r}
+fviz_pca_biplot(pca, repel = TRUE,
+                col.var = "#D2691E", # color para las variables
+                col.ind = "#000000"  # colores de las estaciones
+)
+```
+
+```{r}
+fviz_contrib(pca,choice="var",axes=1,top=21)
+fviz_contrib(pca,choice="var",axes=2,top=21)
+fviz_contrib(pca,choice="var",axes=3,top=21)
+fviz_contrib(pca,choice="var",axes=4,top=21)
+fviz_contrib(pca,choice="var",axes=5,top=21)
+```
+
+```{r}
+var <- get_pca_var(pca)
+corrplot(var$cos2, is.corr = FALSE)
+```
+
+## Metodologías
+
+### Métodos Supervisados
+
+#### Regresión Logística
+
+**Utilizando todas las variables:**
+
+Regresión base:
+
+```{r}
+fit1 <- glm(satisfaction ~ . , data = df_train, family = "binomial")
+summary(fit1)
+```
+
+Predicción:
+
+```{r}
+pred_logistic <- predict(fit1,df_test,type="response")
+y_pred=rep(0,length(pred_logistic))
+y_pred[pred_logistic >.5]= 1
+y_pred<-as.factor(y_pred)
+confusionMatrix(y_pred, df_test$satisfaction,positive="1")
+```
+
+Gráfico ROC
+
+```{r}
+predicciones_rl<- predict(fit1,newdata = df_test,type="response")
+roc_obj <- roc(df_test$satisfaction,predicciones_rl)
+plot(roc_obj)
+auc(roc_obj)
+```
+
+Maximizando Sensibilidad y Especificidad
+
+```{r}
+coords(roc_obj, "best", "threshold")
+```
+
+```{r}
+pred_logistic2<-predict(fit1,df_test,type="response")
+y_pred2 = rep(0, length(pred_logistic2))
+y_pred2[pred_logistic2 > 0.4963353	] = 1
+y_pred2<-as.factor(y_pred2)
+confusionMatrix(y_pred2, df_test$satisfaction, positive = "1")
+```
+
+Maximizando solo Especificidad
+
+```{r}
+roc_metrics <- roc(df_test$satisfaction, predicciones_rl)
+specificity <- roc_metrics$specificities
+thresholds <- roc_metrics$thresholds
+max_specificity_index <- which.max(specificity)
+max_threshold <- thresholds[max_specificity_index]
+cat("Umbral:", max_threshold, "\n")
+```
+
+```{r}
+y_pred2b = rep(0, length(pred_logistic2))
+y_pred2b[pred_logistic2 > 0.9834801 	] = 1
+y_pred2b<-as.factor(y_pred2b)
+confusionMatrix(y_pred2b, df_test$satisfaction, positive = "1")
+```
+
+**Quitando la variable no significativa según el test P-Value "Flight Distance":**
+
+```{r}
+fit2 <- glm(formula=satisfaction ~ .-Flight.Distance , data=df_train,family = "binomial")
+summary(fit2)
+```
+
+```{r}
+predicciones_rl2<- predict(fit2,newdata = df_test,type="response")
+roc_obj2 <- roc(df_test$satisfaction,predicciones_rl2)
+plot(roc_obj2)
+auc(roc_obj2)
+```
+
+```{r}
+coords(roc_obj2, "best", "threshold")
+```
+
+```{r}
+pred_logistic3<-predict(fit2,df_test,type="response")
+y_pred3 = rep(0, length(pred_logistic3))
+y_pred3[pred_logistic3 > 0.4961948] = 1
+y_pred3<-as.factor(y_pred3)
+confusionMatrix(y_pred3, df_test$satisfaction, positive = "1")
+```
+
+Utilizando sólo las variables numéricas:
+
+```{r}
+fit3 <- glm(formula=satisfaction ~ .-Gender-Customer.Type-Type.of.Travel-Class , data=df_train,family = "binomial")
+summary(fit3)
+```
+
+```{r}
+predicciones_rl3<- predict(fit3,newdata = df_test,type="response")
+roc_obj3 <- roc(df_test$satisfaction,predicciones_rl3)
+plot(roc_obj3)
+auc(roc_obj3)
+```
+
+```{r}
+coords(roc_obj3, "best", "threshold")
+```
+
+```{r}
+pred_logistic4<-predict(fit3,df_test,type="response")
+y_pred4 = rep(0, length(pred_logistic4))
+y_pred4[pred_logistic4 > 0.4897866	] = 1
+y_pred4<-as.factor(y_pred4)
+confusionMatrix(y_pred4, df_test$satisfaction, positive = "1")
+```
+
+#### LDA
+
+**Utilizando todas las variables**:
+
+```{r}
+lda.fit <- lda(satisfaction ~ ., data = df_train)
+lda.fit
+```
+
+```{r}
+plot(lda.f
+```
+
+```{r}
+lda.pred=predict(lda.fit, df_test)
+confusionMatrix(lda.pred$class,df_test$satisfaction,positive="1")
+```
+
+```{r}
+num<-as.numeric(lda.pred$posterior[,2])
+roc_obj3 <- roc(df_test$satisfaction,num)
+plot(roc_obj3)
+auc(roc_obj3)
+```
+
+**Quitando la variable no significativa según el test P-Value "Flight Distance" a partir de la regresión logística:**
+
+```{r}
+lda.fit2 <- lda(satisfaction ~ .-Flight.Distance, data = df_train)
+lda.fit2
+```
+
+```{r}
+lda.pred2=predict(lda.fit2, df_test)
+confusionMatrix(lda.pred2$class,df_test$satisfaction,positive="1")
+```
+
+```{r}
+roc_obj4 <- roc(df_test$satisfaction,lda.pred2$posterior[,2])
+plot(roc_obj4)
+auc(roc_obj4)
+```
+
+**Utilizando sólo las variables numéricas:**
+
+```{r}
+lda.fit3 <- lda(satisfaction ~ .-Gender-Customer.Type-Type.of.Travel-Class, data = df_train)
+lda.fit3
+```
+
+```{r}
+lda.pred3=predict(lda.fit3, df_test)
+confusionMatrix(lda.pred3$class,df_test$satisfaction,positive="1")
+```
+
+```{r}
+roc_obj5 <- roc(df_test$satisfaction,lda.pred3$posterior[,2])
+plot(roc_obj5)
+auc(roc_obj5)
+```
+
+#### QDA
+
+**Utilizando todas las variables:**
+
+QDA base:
+
+```{r}
+qda.fit=qda(satisfaction ~ ., data = df_train)
+qda.fit
+```
+
+Predicción utilizando test:
+
+```{r}
+qda.pred=predict(qda.fit, df_test)
+```
+
+Matriz de confusión utilizando test:
+
+```{r}
+confusionMatrix(qda.pred$class,df_test$satisfaction,positive="1")
+```
+
+ROC:
+
+```{r}
+roc_obj_QDA <- roc(df_test$satisfaction,qda.pred$posterior[,2]) 
+plot(roc_obj_QDA)
+auc(roc_obj_QDA)
+```
+
+**Quitando la variable no significativa según el test P-Value "Flight Distance" a partir de la regresión logística:**
+
+```{r}
+qda.fit2=qda(satisfaction ~ .-Flight.Distance, data = df_train)
+qda.fit
+```
+
+```{r}
+qda.pred2=predict(qda.fit2, df_test)
+```
+
+```{r}
+confusionMatrix(qda.pred2$class,df_test$satisfaction,positive="1")
+```
+
+```{r}
+roc_obj_QDA2 <- roc(df_test$satisfaction,qda.pred2$posterior[,2]) 
+plot(roc_obj_QDA2)
+auc(roc_obj_QDA2)
+```
+
+Utilizando sólo las variables numéricas
+
+```{r}
+qda.fit3=qda(satisfaction ~ .-Gender-Customer.Type-Type.of.Travel-Class, data = df_train)
+qda.fit3
+```
+
+```{r}
+qda.pred3=predict(qda.fit3, df_test)
+```
+
+```{r}
+confusionMatrix(qda.pred3$class,df_test$satisfaction,positive="1")
+```
+
+```{r}
+roc_obj_QDA3 <- roc(df_test$satisfaction,qda.pred3$posterior[,2]) 
+plot(roc_obj_QDA3)
+auc(roc_obj_QDA3)
+```
+
+#### KNN
+
+**Utilizando todas las variables:**
+
+Se extraen las variables categóricas de los datos:
+
+```{r}
+train_knn <- df_train
+train_knn <- df_train %>% dplyr::select(-Gender,-satisfaction,-Customer.Type,-Type.of.Travel,-Class) 
+
+test_knn <- df_test
+test_knn  <- df_test %>% dplyr::select(-Gender,-satisfaction,-Customer.Type,-Type.of.Travel,-Class) 
+```
+
+```{r}
+mtrain_knn <- slice_sample(.dat=df_train, n=1000)
+mtest_knn <- slice_sample(.dat=df_test, n=1000)
+```
+
+**Maximizando exactitud**
+
+Se nota que el óptimo de KNN se encuentra a accuracy=7 , por lo que el intercepto del eje x es k=7:
+
+```{r}
+overall.accuracy = c()
+for (i in 1:20){
+  knn.pred=knn(train_knn,test_knn,df_train$satisfaction,k=i)
+  values = confusionMatrix(table(knn.pred,df_test$satisfaction))
+  overall = values$overall
+  overall.accuracy = append(overall.accuracy , overall["Accuracy"])
+}
+acc = data.frame(k=1:20, accuracy = overall.accuracy)
+ggplot(acc) + aes(x = k, y = accuracy) +geom_line(size = 0.5, colour = "#112446") +  theme_minimal() + geom_vline(xintercept = 7, color = "red")
+```
+
+**Maximizando especificidad:**
+
+Para todas las variables:
+
+Se nota que el óptimo de KNN se encuentra a accuracy=1 , por lo que el intercepto del eje x es k=1:
+
+```{r}
+overall.specificity = c()
+for (i in 1:20){
+  knn.pred=knn(train_knn,test_knn,df_train$satisfaction,k=i)
+  values = confusionMatrix(table(knn.pred,df_test$satisfaction))
+  overall = values$byClass
+  overall.specificity = append(overall.specificity , overall["Specificity"])
+}
+spec = data.frame(k=1:20, specificity = overall.specificity)
+ggplot(spec) + aes(x = k, y = specificity) +geom_line(size = 0.5, colour = "#112446") +  theme_minimal() + geom_vline(xintercept = 1, color = "red")
+```
+
+#### Árbol de decisión
+
+**Utilizando todas las variables:**
+
+*Tipo 1*
+
+```{r}
+tree.fit = tree(satisfaction~ . , data=df_train)
+summary(tree.fit)
+```
+
+```{r}
+plot(tree.fit)
+text(tree.fit, pretty=0)
+```
+
+```{r}
+tree_pred=predict(tree.fit, df_test , type ="class")
+confusionMatrix(tree_pred,df_test$satisfaction,positive="1")
+```
+
+*Tipo 2*
+
+```{r}
+tree.fit2 = rpart(formula=satisfaction~ . , data=df_train)
+summary(tree.fit2)
+tree_plot = rpart.plot(tree.fit2)
+```
+
+```{r}
+tree_pred2=predict(tree.fit2, df_test , type ="class")
+confusionMatrix(tree_pred2,df_test$satisfaction,positive="1")
+```
+
+**Quitando la variable no significativa según el test P-Value "Flight Distance" a partir de la regresión logística:**
+
+*Tipo 1*
+
+```{r}
+tree.fit3 = tree(satisfaction~ .-Flight.Distance , data=df_train)
+summary(tree.fit3)
+plot(tree.fit3)
+text(tree.fit3, pretty=0)
+tree_pred3=predict(tree.fit3, df_test , type ="class")
+confusionMatrix(tree_pred3,df_test$satisfaction,positive="1")
+```
+
+*Tipo 2*
+
+```{r}
+tree.fit4 = rpart(formula=satisfaction~ .-Flight.Distance , data=df_train)
+summary(tree.fit4)
+tree_plot2 = rpart.plot(tree.fit4)
+tree_pred4=predict(tree.fit4, df_test , type ="class")
+confusionMatrix(tree_pred4,df_test$satisfaction,positive="1")
+```
+
+**Utilizando sólo variables numéricas:**
+
+```{r}
+tree.fit5 = tree(satisfaction~ .-Gender-Customer.Type-Type.of.Travel-Class , data=df_train)
+summary(tree.fit5)
+plot(tree.fit5)
+text(tree.fit5, pretty=0)
+tree_pred5=predict(tree.fit5, df_test , type ="class")
+confusionMatrix(tree_pred5,df_test$satisfaction,positive="1")
+```
+
+```{r}
+tree.fit6 = rpart(formula=satisfaction~ .-Gender-Customer.Type-Type.of.Travel-Class, data=df_train)
+summary(tree.fit6)
+tree_plot6 = rpart.plot(tree.fit6)
+tree_pred6=predict(tree.fit6, df_test , type ="class")
+confusionMatrix(tree_pred6,df_test$satisfaction,positive="1")
+```
+
+#### SVM
+
+**Utilizando sólo variables numéricas:**
+
+Base de datos para SVM
+
+```{r}
+df_train_svm <- df_train
+df_test_svm <- df_test
+```
+
+```{r}
+
+df_train_svm <- df_train_svm %>% dplyr::select(-Gender,-Customer.Type,-Type.of.Travel,-Class) 
+
+df_test_svm  <- df_test_svm %>% dplyr::select(-Gender,-Customer.Type,-Type.of.Travel,-Class) 
+
+```
+
+```{r}
+glimpse(df_test_svm)
+```
+
+```{r}
+for (i in c("Age","Flight.Distance","Inflight.wifi.service","Departure.Arrival.time.convenient","Ease.of.Online.booking","Gate.location","Food.and.drink","Online.boarding","Seat.comfort","Inflight.entertainment","On.board.service","Leg.room.service","Baggage.handling","Checkin.service","Inflight.service","Cleanliness","Departure.Delay.in.Minutes","Arrival.Delay.in.Minutes"))
+{
+df_train_svm[[i]]<-as.numeric(df_train_svm[[i]])
+df_test_svm[[i]]<-as.numeric(df_test_svm[[i]])
+}
+```
+
+```{r}
+df_train_svm[-19] = scale(df_train_svm[-19])
+df_test_svm[-19] = scale(df_test_svm[-19])
+```
+
+SVM base:
+
+```{r}
+svm_fit <- svm(formula = satisfaction ~ ., data = df_train_svm, kernel = 'linear')
+summary(svm_fit)
+```
+
+```{r}
+svm_pred=predict(svm_fit, df_test_svm , type ="class")
+confusionMatrix(svm_pred,df_test_svm$satisfaction,positive="1")
+```
+
+```{r}
+svm_fit2 <- svm(formula = satisfaction ~ ., data = df_train_svm, kernel = 'radial')
+summary(svm_fit2)
+```
+
+```{r}
+svm_pred_2=predict(svm_fit2, df_test_svm , type ="class")
+confusionMatrix(svm_pred_2,df_test_svm$satisfaction,positive="1")
+```
+
+**Quitando la variable no significativa según el test P-Value "Flight Distance" a partir de la regresión logística:**
+
+```{r}
+svm_fit3 <- svm(formula = satisfaction ~ .-Flight.Distance, data = df_train_svm, kernel = 'linear')
+summary(svm_fit3)
+```
+
+```{r}
+svm_pred3=predict(svm_fit3, df_test_svm , type ="class")
+confusionMatrix(svm_pred3,df_test_svm$satisfaction,positive="1")
+```
+
+```{r}
+svm_fit4 <- svm(formula = satisfaction ~ .-Flight.Distance, data = df_train_svm, kernel = 'radial')
+summary(svm_fit4)
+```
+
+```{r}
+svm_pred_4=predict(svm_fit4, df_test_svm , type ="class")
+confusionMatrix(svm_pred_4,df_test_svm$satisfaction,positive="1")
+```
+
+##### Gráficos SVM
+
+```{r}
+df_train_svm_g <- df_train_svm %>% dplyr:: select(-Age,-Flight.Distance,-Inflight.wifi.service,-Departure.Arrival.time.convenient,-Ease.of.Online.booking,-Gate.location,-Food.and.drink,-Online.boarding,-Seat.comfort,-On.board.service,-Leg.room.service,-Baggage.handling,-Checkin.service,-Inflight.service,-Departure.Delay.in.Minutes,-Arrival.Delay.in.Minutes)
+```
+
+```{r}
+muestreo2g <- as.data.frame(df_train_svm_g[rand_df,])
+nrow(muestreo2)
+```
+
+```{r}
+svm_fit1.1 <- svm(formula = satisfaction ~ Cleanliness + Inflight.entertainment, data = muestreo2g, kernel = 'linear')
+summary(svm_fit1.1)
+plot(svm_fit1.1, muestreo2g)
+```
+
+```{r}
+df_train_svm_g1 <- df_train_svm %>% dplyr:: select(-Age,-Flight.Distance,-Inflight.wifi.service,-Departure.Arrival.time.convenient,-Ease.of.Online.booking,-Gate.location,-Food.and.drink,-Online.boarding,-On.board.service,-Leg.room.service,-Baggage.handling,-Checkin.service,-Inflight.service,-Departure.Delay.in.Minutes,-Arrival.Delay.in.Minutes,-Inflight.entertainment)
+```
+
+```{r}
+muestreo2g1 <- as.data.frame(df_train_svm_g1[rand_df,])
+nrow(muestreo2g1)
+```
+
+```{r}
+svm_fit1.2 <- svm(formula = satisfaction ~ Cleanliness + Seat.comfort, data = muestreo2g1, kernel = 'linear')
+summary(svm_fit1.2)
+plot(svm_fit1.2, muestreo2g1)
+```
+
+```{r}
+df_train_svm_g2 <- df_train_svm %>% dplyr:: select(-Age,-Flight.Distance,-Inflight.wifi.service,-Departure.Arrival.time.convenient,-Ease.of.Online.booking,-Gate.location,-Food.and.drink,-Online.boarding,-On.board.service,-Leg.room.service,-Baggage.handling,-Checkin.service,-Inflight.service,-Departure.Delay.in.Minutes,-Arrival.Delay.in.Minutes,-Cleanliness)
+```
+
+```{r}
+muestreo2g2 <- as.data.frame(df_train_svm_g2[rand_df,])
+```
+
+```{r}
+svm_fit1.3 <- svm(formula = satisfaction ~ Inflight.entertainment + Seat.comfort, data = muestreo2g2, kernel = 'linear')
+summary(svm_fit1.3)
+plot(svm_fit1.3, muestreo2g2)
+```
+
+### Métodos No Supervisados
+
+#### K-means
+
+```{r}
+k2 <- kmeans(dfnum1, centers = 2, nstart = 25)
+k3 <- kmeans(dfnum1, centers = 3, nstart = 25)
+k4 <- kmeans(dfnum1, centers = 4, nstart = 25)
+k5 <- kmeans(dfnum1, centers = 5, nstart = 25)
+```
+
+```{r}
+p1 <- fviz_cluster(k2, geom = "point", data = dfnum1) + ggtitle("k = 2")
+p2 <- fviz_cluster(k3, geom = "point", data = dfnum1) + ggtitle("k = 3")
+p3 <- fviz_cluster(k4, geom = "point", data = dfnum1) + ggtitle("k = 4")
+p4 <- fviz_cluster(k5, geom = "point", data = dfnum1) + ggtitle("k = 5")
+```
+
+```{r}
+grid.arrange(p1, p2, p3, p4, nrow = 2)
+```
+
+```{r}
+fviz_cluster(k2, data = dfnum1)
+```
+
+```{r}
+rand_df <- sample(1:101307,1000,replace = F)
+```
+
+```{r}
+muestreo2 <- as.data.frame(dfnum1[rand_df,])
+nrow(muestreo2)
+```
+
+```{r}
+fviz_nbclust(muestreo2, kmeans, method = "silhouette", k.max = 20)
+```
+
+```{r}
+fviz_nbclust(muestreo2, kmeans, method = "wss", k.max = 20)
+```
+
+```{r}
+fviz_nbclust(muestreo2, kmeans, "gap_stat", k.max = 20)
+```
+
+Creación de base de datos para iteración Kmeans
+
+```{r}
+df_kmeans <- filter_if(df, is.character , all_vars(!is.na(.)))
+for (i in c("Flight.Distance"))
+{
+    outliers <- boxplot.stats(df_kmeans[[i]])$out
+    df_kmeans[[i]][df_kmeans[[i]] %in% outliers] <- NA
+}
+df_kmeans <- filter_if(df_kmeans, is.numeric , all_vars(!is.na(.)))
+df_kmeans <- select_if(df_kmeans, is.numeric)
+```
+
+```{r}
+rand_df2 <- sample(1:101307,101307,replace = F)
+muestreo3 <- as.data.frame(df_kmeans[rand_df2,])
+muestreo3 <- muestreo3 %>% mutate(Contador_Observaciones = seq_along(Age))
+```
+
+```{r}
+muestreo4 <- muestreo3 %>% dplyr::select(-X,-id, -Contador_Observaciones)
+```
+
+```{r}
+k2b <- kmeans(muestreo4, centers = 2, nstart = 25)
+```
+
+```{r}
+resultado <- 0
+total <- 0
+for(i in muestreo3$Contador_Observaciones) {
+    if (df$satisfaction[df$X == muestreo3$X[muestreo3$Contador_Observaciones==i]] == "satisfied") {
+       if(k2b[["cluster"]][[i]]==2){
+  resultado <- resultado + 1
+  }
+    }
+  if (k2b[["cluster"]][[i]]==2) {
+  total <- total + 1
+  }  
+}
+resultado
+total
+razon_k2 <- resultado/total
+razon_k2
+```
+
+```{r}
+resultado2 <- 0
+total2 <- 0
+for(i in muestreo3$Contador_Observaciones) {
+    if (df$satisfaction[df$X == muestreo3$X[muestreo3$Contador_Observaciones==i]] == "satisfied") {
+       if(k2b[["cluster"]][[i]]==1){
+  resultado2 <- resultado2 + 1
+  }
+    }
+  if (k2b[["cluster"]][[i]]==1) {
+  total2 <- total2 + 1
+  }  
+}
+resultado2
+total2
+razon_k2c <- resultado2/total2
+razon_k2c
+```
+
+#### Agrupamiento Jerárquico
+
+##### Método 1
+
+```{r}
+d <- dist(muestreo2, method = "euclidean")
+```
+
+```{r}
+hc1 <- hclust(d, method = "complete" )
+```
+
+```{r}
+plot(hc1, cex = 0.6, hang = -1)
+```
+
+##### Método 2
+
+```{r,results='hide',warning=FALSE,message=FALSE}
+hc2 <- agnes(muestreo2, method = "complete")
+```
+
+```{r}
+hc2$ac
+```
+
+```{r,results='hide',warning=FALSE,message=FALSE}
+m <- c( "average", "single", "complete", "ward")
+names(m) <- c( "average", "single", "complete", "ward")
+```
+
+```{r,results='hide',warning=FALSE,message=FALSE}
+ac <- function(x) {
+  agnes(muestreo2, method = x)$ac
+}
+```
+
+```{r}
+map_dbl(m, ac)
+```
+
+```{r}
+hc3 <- agnes(muestreo2, method = "ward")
+pltree(hc3, cex = 0.6, hang = -1, main = "Dendrogram of agnes") 
+```
+
+##### Método 3
+
+```{r,results='hide',warning=FALSE,message=FALSE}
+hc4 <- diana(muestreo2)
+```
+
+```{r}
+hc4$dc
+```
+
+```{r}
+pltree(hc4, cex = 0.6, hang = -1, main = "Dendrogram of diana")
+```
+
+```{r,results='hide',warning=FALSE,message=FALSE}
+hc5 <- hclust(d, method = "ward.D2" )
+```
+
+Corte en 4:
+
+```{r,results='hide',warning=FALSE,message=FALSE}
+sub_grp <- cutree(hc5, k = 4)
+```
+
+```{r}
+table(sub_grp)
+```
+
+```{r}
+muestreo2 %>%
+  mutate(cluster = sub_grp) %>%
+  head
+```
+
+```{r}
+plot(hc5, cex = 0.6)
+rect.hclust(hc5, k = 4, border = 2:5)
+```
+
+```{r}
+fviz_cluster(list(data = muestreo2, cluster = sub_grp))
+```
+
+```{r}
+fviz_nbclust(muestreo2, FUN = hcut, method = "wss")
+fviz_nbclust(muestreo2, FUN = hcut, method = "silhouette")
+gap_stat <- clusGap(muestreo2, FUN = hcut, nstart = 25, K.max = 10, B = 50)
+fviz_gap_stat(gap_stat)
+```
+
+#### Redes Neuronales
+
+```{r}
+df_train_RN<- df_train
+df_test_RN<- df_test
+```
+
+```{r}
+for (i in c("Gender","Customer.Type","Type.of.Travel","Class"))
+{
+df_train_RN[[i]]<-as.numeric(df_train_RN[[i]])
+}
+for (i in c("Gender","Customer.Type","Type.of.Travel","Class"))
+{
+df_test_RN[[i]]<-as.numeric(df_test_RN[[i]])
+}
+```
+
+```{r}
+df_train_RN$Gender[df_train_RN$Gender=="Female"]<-0
+df_train_RN$Gender[df_train_RN$Gender=="Male"]<-1
+df_train_RN$Customer.Type[df_train_RN$Customer.Type=="Loyal Customer"]<-1
+df_train_RN$Customer.Type[df_train_RN$Customer.Type=="disloyal Customer"]<-0
+df_train_RN$Type.of.Travel[df_train_RN$Type.of.Travel=="Personal Travel"]<-0
+df_train_RN$Type.of.Travel[df_train_RN$Type.of.Travel=="Business travel"]<-1
+df_train_RN$Class[df_train_RN$Class=="Eco"]<-0
+df_train_RN$Class[df_train_RN$Class=="Eco Plus"]<-1
+df_train_RN$Class[df_train_RN$Class=="Business"]<-2
+
+
+df_test_RN$Gender[df_test_RN$Gender=="Female"]<-0
+df_test_RN$Gender[df_test_RN$Gender=="Male"]<-1
+df_test_RN$Customer.Type[df_test_RN$Customer.Type=="Loyal Customer"]<-1
+df_train_RN$Customer.Type[df_train_RN$Customer.Type=="disloyal Customer"]<-0
+df_test_RN$Type.of.Travel[df_test_RN$Type.of.Travel=="Personal Travel"]<-0
+df_test_RN$Type.of.Travel[df_test_RN$Type.of.Travel=="Business travel"]<-1
+df_test_RN$Class[df_test_RN$Class=="Eco"]<-0
+df_test_RN$Class[df_test_RN$Class=="Eco Plus"]<-1
+df_test_RN$Class[df_test_RN$Class=="Business"]<-2
+```
+
+```{r}
+set.seed(163)
+
+concrete_model2 <- neuralnet(satisfaction ~ ., data = df_train_RN)
+plot(concrete_model2, rep="best")
+```
+
+```{r}
+set.seed(163)
+
+concrete_model <- neuralnet(satisfaction ~ .-Gender-Customer.Type-Type.of.Travel-Class, data = df_train)
+```
+
+```{r}
+plot(concrete_model, rep="best")
+```
+
+**Usando todas las variables**
+
+```{r}
+set.seed(163)
+nnet_mod <-
+  mlp(
+    hidden_units = 5,
+    epochs = 2,
+    penalty = 0.2
+  ) %>%
+  set_mode("classification") %>% 
+  set_engine("nnet", verbose = 0) 
+```
+
+```{r}
+satisfaction_recipe <- recipe(satisfaction ~ ., data = df_train) %>% 
+  step_dummy(all_factor_predictors())
+```
+
+```{r}
+nnet_wflow <-
+  workflow() %>%
+  add_recipe(satisfaction_recipe) %>% 
+  add_model(nnet_mod)  
+```
+
+```{r}
+nnet_fit <- nnet_wflow %>% 
+  fit( data = df_train)
+```
+
+```{r}
+nnet_res <- df_test %>% dplyr::select(satisfaction) %>% 
+  bind_cols(nnet_fit %>% predict(new_data = df_test)) %>% 
+  bind_cols(nnet_fit %>% predict(new_data = df_test, type = "prob"))
+
+
+conf_mat(nnet_res,satisfaction, .pred_class)
+```
+
+**Usando solo las numèricas**
+
+```{r}
+df_train_RN2<- df_train
+df_test_RN2<- df_test
+```
+
+```{r}
+df_train_RN2 <- df_train_RN2 %>% dplyr::select(-Gender,-Customer.Type,-Type.of.Travel,-Class) 
+df_test_RN2 <- df_test_RN2 %>% dplyr::select(-Gender,-Customer.Type,-Type.of.Travel,-Class) 
+```
+
+```{r}
+nnet_mod2 <-
+  mlp(
+    hidden_units = 5,
+    epochs = 2,
+    penalty = 0.2
+  ) %>%
+  set_mode("classification") %>% 
+  set_engine("nnet", verbose = 0) 
+```
+
+```{r}
+satisfaction_recipe2 <- recipe(satisfaction ~ ., data = df_train_RN2) %>% 
+  step_dummy(all_factor_predictors())
+```
+
+```{r}
+nnet_wflow2 <-
+  workflow() %>%
+  add_recipe(satisfaction_recipe2) %>% 
+  add_model(nnet_mod2)
+```
+
+```{r}
+nnet_fit2 <- nnet_wflow2 %>% 
+  fit( data = df_train_RN2)
+```
+
+```{r}
+nnet_res2 <- df_test_RN2 %>% dplyr::select(satisfaction) %>% 
+  bind_cols(nnet_fit2 %>% predict(new_data = df_test_RN2)) %>% 
+  bind_cols(nnet_fit2 %>% predict(new_data = df_test_RN2, type = "prob"))
+
+
+conf_mat(nnet_res2,satisfaction, .pred_class)
+```
+
+```{r}
+df_train_RN3<- df_train
+df_test_RN3<- df_test
+```
+
+```{r}
+df_train_RN3 <- df_train_RN3 %>% dplyr::select(-Flight.Distance) 
+df_test_RN3 <- df_test_RN3 %>% dplyr::select(-Flight.Distance)
+```
+
+```{r}
+set.seed(163)
+nnet_mod3 <-
+  mlp(
+    hidden_units = 2,
+    epochs = 2,
+    penalty = 0.2
+  ) %>%
+  set_mode("classification") %>% 
+  set_engine("nnet", verbose = 0)
+```
+
+```{r}
+satisfaction_recipe3 <- recipe(satisfaction ~ ., data = df_train_RN3) %>% 
+  step_dummy(all_factor_predictors())
+```
+
+```{r}
+nnet_wflow3<-
+  workflow() %>%
+  add_recipe(satisfaction_recipe3) %>% 
+  add_model(nnet_mod3)
+```
+
+```{r}
+nnet_fit3 <- nnet_wflow3 %>% 
+  fit( data = df_train_RN3)
+```
+
+```{r}
+nnet_res3 <- df_test_RN3 %>% dplyr::select(satisfaction) %>% 
+  bind_cols(nnet_fit3 %>% predict(new_data = df_test_RN3)) %>% 
+  bind_cols(nnet_fit3 %>% predict(new_data = df_test_RN3, type = "prob"))
+
+
+conf_mat(nnet_res3,satisfaction, .pred_class)
+```
